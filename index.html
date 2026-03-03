@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>下班倒计时（日薪版）</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    body {
+      background-color: #ffffff;
+      color: #334155;
+      padding-bottom: 80px;
+    }
+    .container {
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 20px 16px;
+    }
+    /* 实时收入模块 */
+    .live-income { display: block; }
+    .header { text-align: center; margin-bottom: 32px; }
+    .total-income {
+      font-size: clamp(24px, 7vw, 38px);
+      font-weight: 600;
+      color: #15803d;
+      white-space: nowrap;
+      text-align: center;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .status { 
+      font-size: 16px; 
+      color: #64748b; 
+      margin-top: 8px;
+      letter-spacing: 0.5px;
+    }
+    /* 反向圆环倒计时 - 白绿清新风格 移除黑框 */
+    .circle-box {
+      width: min(80vw, 300px);
+      height: min(80vw, 300px);
+      margin: 0 auto;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .circle-bg {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 1px solid #f0fdf4;
+    }
+    .circle-progress {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: conic-gradient(#22c55e 100%, #f8fafc 100%);
+      -webkit-mask: radial-gradient(transparent 68%, #000 68%);
+      mask: radial-gradient(transparent 68%, #000 68%);
+    }
+    .circle-inner {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      padding: 20px;
+    }
+    .timer { 
+      font-size: clamp(26px, 8vw, 36px); 
+      font-weight: 600; 
+      color: #15803d; 
+      letter-spacing: 1px;
+    }
+    .tips {
+      font-size: 15px;
+      color: #64748b;
+      margin-top: 10px;
+      font-weight: 500;
+    }
+    /* 日历模块 - 纯白清新风格 */
+    .calendar-module { display: none; }
+    /* 优化后的日历头部布局，自适应各种屏幕 */
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding: 0 4px;
+      position: relative;
+    }
+    .calendar-header-left {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .calendar-header-center {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      min-width: 120px;
+    }
+    .calendar-header-right {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .calendar-header h2 {
+      font-size: clamp(16px, 5vw, 20px);
+      color: #1e293b;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    /* 开关样式 - 白绿适配 无黑框 */
+    .switch {
+      width: 48px; height: 26px; background: #f8fafc; border-radius: 13px;
+      position: relative; cursor: pointer; transition: all 0.3s ease;
+      border: 1px solid #e2e8f0;
+    }
+    .switch::before {
+      content: ""; position: absolute; width: 22px; height: 22px;
+      left: 2px; top: 2px; background: white; border-radius: 50%; 
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      transition: all 0.3s ease;
+    }
+    .switch.on { background: #22c55e; }
+    .switch.on::before { transform: translateX(22px); }
+    /* 月份切换按钮样式优化 */
+    .month-nav {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .month-nav span {
+      cursor: pointer;
+      color: #22c55e;
+      font-size: clamp(18px, 6vw, 22px);
+      white-space: nowrap;
+      padding: 4px 8px;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+      line-height: 1;
+    }
+    .month-nav span:hover {
+      background: #f0fdf4;
+    }
+    /* 日历卡片 - 纯白无黑框 */
+    .calendar {
+      background: white; 
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 12px rgba(148, 163, 184, 0.05);
+      border: 1px solid #f0fdf4;
+      touch-action: pan-y; /* 允许垂直滚动，禁止水平滚动干扰 */
+    }
+    .calendar-weekdays {
+      display: grid; grid-template-columns: repeat(7,1fr);
+      text-align: center; color: #94a3b8; font-size: 14px; 
+      margin-bottom: 16px;
+    }
+    .calendar-days {
+      display: grid; grid-template-columns: repeat(7,1fr); gap: 10px;
+    }
+    .calendar-day {
+      aspect-ratio: 1; display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      border-radius: 12px;
+      font-size: clamp(14px, 4vw, 16px); 
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: #f8fafc;
+      border: 1px solid #f0fdf4;
+    }
+    .calendar-day:hover {
+      background: #f0fdf4;
+      transform: scale(1.05);
+      box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
+    }
+    .calendar-day.selected { 
+      background: #22c55e;
+      color: white; 
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+      border: none;
+    }
+    .calendar-day.today { 
+      border: 2px solid #15803d;
+      font-weight: 600;
+    }
+    .work-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #15803d;
+      margin-top: 5px;
+    }
+    /* 表单面板 - 纯白无黑框 */
+    .batch-panel, .day-form, .day-info {
+      background: white; 
+      border-radius: 20px; 
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 12px rgba(148, 163, 184, 0.05);
+      border: 1px solid #f0fdf4;
+      display: none;
+    }
+    .batch-panel.active, .day-form.active, .day-info.active { display: block; }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { 
+      display: block; 
+      margin-bottom: 10px; 
+      color: #64748b;
+      font-size: 15px;
+      font-weight: 500;
+    }
+    .form-group input {
+      width: 100%; 
+      padding: 14px 16px; 
+      border: 1px solid #f0fdf4;
+      border-radius: 12px;
+      font-size: 16px;
+      background: #f8fafc;
+      transition: all 0.2s ease;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #22c55e;
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+      background: white;
+    }
+    /* 按钮样式 - 白绿适配 无黑框 */
+    .btn {
+      background: #22c55e;
+      color: white; 
+      border: none;
+      border-radius: 12px; 
+      padding: 16px; 
+      width: 100%;
+      font-size: 17px; 
+      margin-top: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2);
+    }
+    .btn:hover {
+      background: #16a34a;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+    }
+    .btn.del { 
+      background: #ef4444; 
+      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+    }
+    .btn.del:hover {
+      background: #dc2626;
+    }
+    /* 信息面板 */
+    .info-item { 
+      margin-bottom: 12px; 
+      font-size: 16px;
+    }
+    .info-label { 
+      color: #64748b; 
+      font-weight: 500;
+      margin-right: 8px;
+    }
+    /* 底部Tab栏 - 纯白无黑框 */
+    .tab-bar {
+      position: fixed; 
+      bottom: 0; left:0; right:0;
+      background: white; 
+      display: flex; 
+      justify-content: space-around;
+      padding: 14px 0 10px 0; 
+      border-top: 1px solid #f0fdf4;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.02);
+      z-index: 90;
+    }
+    .tab-item {
+      display: flex; 
+      flex-direction: column; 
+      align-items: center;
+      color: #94a3b8; 
+      font-size: 12px; 
+      cursor: pointer;
+      transition: all 0.2s ease;
+      padding: 4px 12px;
+    }
+    .tab-item.active { 
+      color: #22c55e;
+    }
+    .tab-item span { 
+      font-size: 22px; 
+      margin-bottom: 6px;
+    }
+    /* 弹窗样式 - 纯白无黑框 弱化遮罩 */
+    .modal {
+      position: fixed; 
+      top:0;left:0;right:0;bottom:0;
+      background: rgba(0,0,0,0.1);
+      display: none;
+      justify-content: center; 
+      align-items: center;
+      backdrop-filter: blur(2px);
+      z-index: 99;
+    }
+    .modal-box {
+      background: white; 
+      border-radius: 20px; 
+      padding: 28px;
+      width: 85%; 
+      max-width: 340px;
+      box-shadow: 0 4px 16px rgba(148, 163, 184, 0.08);
+      text-align: center;
+      border: 1px solid #f0fdf4;
+    }
+    .modal-box div:first-child {
+      font-size: 17px;
+      color: #1e293b;
+      font-weight: 500;
+      margin-bottom: 24px;
+    }
+    .modal-btns {
+      display: flex; gap:12px; 
+    }
+    .modal-btns button {
+      flex:1; 
+      padding: 12px; 
+      border-radius: 10px; 
+      border:none;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-cancel { 
+      background: #f8fafc; 
+      color: #64748b;
+      border: 1px solid #f0fdf4;
+    }
+    .btn-cancel:hover {
+      background: #f0fdf4;
+    }
+    .btn-delete { 
+      background: #ef4444; 
+      color:white;
+    }
+    .btn-delete:hover {
+      background: #dc2626;
+    }
+    /* 自定义时间选择器样式 */
+    .time-picker-modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.2);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(3px);
+      z-index: 100;
+    }
+    .time-picker-wrap {
+      background: white;
+      border-radius: 20px;
+      padding: 24px 16px;
+      width: 85%;
+      max-width: 320px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      border: 1px solid #f0fdf4;
+    }
+    .time-picker-title {
+      text-align: center;
+      font-size: 18px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 20px;
+    }
+    .picker {
+      width: 280px;
+      height: 220px;
+      position: relative;
+      display: flex;
+      overflow: hidden;
+      border-top: 1px solid #eee;
+      border-bottom: 1px solid #eee;
+      margin: 0 auto 20px;
+    }
+    .picker .col {
+      flex: 1;
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+    .picker .list {
+      width: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      transition: transform 0.38s cubic-bezier(0.15, 0.55, 0.25, 1);
+      transform-origin: center center;
+    }
+    .picker .item {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      color: #999;
+    }
+    .picker .item.active {
+      color: #22c55e;
+      font-size: 18px;
+      font-weight: 500;
+    }
+    .picker .bar {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 44px;
+      transform: translateY(-50%);
+      background: rgba(245,245,245,0.5);
+      pointer-events: none;
+      z-index: 2;
+    }
+    .time-picker-btns {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .time-picker-btns button {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      border: none;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .time-picker-cancel {
+      background: #f8fafc;
+      color: #64748b;
+      border: 1px solid #f0fdf4;
+    }
+    .time-picker-confirm {
+      background: #22c55e;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="live-income" id="liveIncome">
+    <div class="header">
+      <div class="total-income" id="totalIncome">今日收入：0.00 元</div>
+      <div class="status" id="status">加载中...</div>
+    </div>
+    <div class="circle-box">
+      <div class="circle-bg"></div>
+      <div class="circle-progress" id="circleProgress"></div>
+      <div class="circle-inner">
+        <div class="timer" id="timer">00:00:00</div>
+        <div class="tips" id="tips">距离下班</div>
+      </div>
+    </div>
+  </div>
+  <div class="calendar-module" id="calendarModule">
+    <div class="calendar-header">
+      <div class="calendar-header-left">
+        <div class="switch" id="batchSwitch"></div>
+      </div>
+      <div class="calendar-header-center">
+        <h2 id="calTitle"></h2>
+      </div>
+      <div class="calendar-header-right">
+        <div class="month-nav">
+          <span id="prevMonth">‹</span>
+          <span id="nextMonth">›</span>
+        </div>
+      </div>
+    </div>
+    <div class="calendar" id="calendarSwipe">
+      <div class="calendar-weekdays">
+        <div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div><div>日</div>
+      </div>
+      <div class="calendar-days" id="calDays"></div>
+    </div>
+    <div class="batch-panel" id="batchPanel">
+      <div class="form-group">
+        <label>上班时间</label>
+        <input type="text" id="batchStart" readonly placeholder="选择上班时间">
+      </div>
+      <div class="form-group">
+        <label>下班时间</label>
+        <input type="text" id="batchEnd" readonly placeholder="选择下班时间">
+      </div>
+      <div class="form-group">
+        <label>日薪（元/天）</label>
+        <input type="number" id="batchRate" placeholder="请输入日薪">
+      </div>
+      <button class="btn" id="saveBatch">保存选中日期排班</button>
+      <button class="btn del" id="deleteBatch">删除选中日期排班</button>
+    </div>
+    <div class="day-form" id="dayForm">
+      <div class="form-group">
+        <label>上班时间</label>
+        <input type="text" id="setStart" readonly placeholder="选择上班时间">
+      </div>
+      <div class="form-group">
+        <label>下班时间</label>
+        <input type="text" id="setEnd" readonly placeholder="选择下班时间">
+      </div>
+      <div class="form-group">
+        <label>日薪（元/天）</label>
+        <input type="number" id="setRate" placeholder="请输入日薪">
+      </div>
+      <button class="btn" id="saveDay">保存此日排班</button>
+      <button class="btn del" id="deleteDay">删除此日排班</button>
+    </div>
+    <div class="day-info" id="dayInfo">
+      <div class="info-item">
+        <span class="info-label">日期：</span>
+        <span id="infoDate"></span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">时间：</span>
+        <span id="infoTime"></span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">日薪：</span>
+        <span id="infoRate"></span>
+      </div>
+      <!-- 新增时薪显示 -->
+      <div class="info-item">
+        <span class="info-label">时薪：</span>
+        <span id="infoHourRate"></span>
+      </div>
+      <button class="btn" id="modifyDay">修改</button>
+      <button class="btn del" id="removeDay">删除</button>
+    </div>
+  </div>
+</div>
+<!-- 底部Tab栏 -->
+<div class="tab-bar">
+  <div class="tab-item active" id="tabMoney">
+    <span>💰</span>
+    <div>实时收入</div>
+  </div>
+  <div class="tab-item" id="tabCal">
+    <span>📅</span>
+    <div>日历排班</div>
+  </div>
+</div>
+<!-- 删除确认弹窗 -->
+<div class="modal" id="batchDelModal">
+  <div class="modal-box">
+    <div>确定删除选中日期的排班？</div>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="batchDelCancel">取消</button>
+      <button class="btn-delete" id="batchDelConfirm">确认删除</button>
+    </div>
+  </div>
+</div>
+<div class="modal" id="delModal">
+  <div class="modal-box">
+    <div>确定删除该排班？</div>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="delCancel">取消</button>
+      <button class="btn-delete" id="delConfirm">确认删除</button>
+    </div>
+  </div>
+</div>
+<!-- 自定义时间选择器弹窗 -->
+<div class="time-picker-modal" id="timePickerModal">
+  <div class="time-picker-wrap">
+    <div class="time-picker-title" id="pickerTitle">选择时间</div>
+    <div class="picker">
+      <div class="col" id="colHour">
+        <div class="list" id="listHour"></div>
+        <div class="bar"></div>
+      </div>
+      <div class="col" id="colMin">
+        <div class="list" id="listMin"></div>
+        <div class="bar"></div>
+      </div>
+    </div>
+    <div class="time-picker-btns">
+      <button class="time-picker-cancel" id="pickerCancel">取消</button>
+      <button class="time-picker-confirm" id="pickerConfirm">确认</button>
+    </div>
+  </div>
+</div>
+<script>
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,0)}-${String(today.getDate()).padStart(2,0)}`;
+  let cy = today.getFullYear();
+  let cm = today.getMonth();
+  let isBatch = false;
+  let selectedSet = new Set();
+  let currentDay = null;
+  let schedules = JSON.parse(localStorage.getItem('schedules')) || {};
+  let currentInput = null;
+  // ===================== 时间选择器核心配置 - 修复滑动+默认系统时间 =====================
+  const ITEM_HEIGHT = 44;
+  const ANIM_SMOOTH = '0.38s cubic-bezier(0.15, 0.55, 0.25, 1)';
+  const HOUR_INERTIA = 0.8;
+  const HOUR_MAX_STEP = 10;
+  const HOUR_VEL_DECAY = 0.6;
+  const MIN_INERTIA = 0.85;
+  const MIN_MAX_STEP = 20;
+  const MIN_VEL_DECAY = 0.55;
+  let pickerHour = new Date().getHours(); // 初始默认系统当前小时
+  let pickerMin = new Date().getMinutes(); // 初始默认系统当前分钟
+  let itemsHour = [];
+  let itemsMin = [];
+  // 计算平均时薪
+  function calcHourRate(sTime, eTime, dayRate) {
+    const [sh, sm] = sTime.split(':').map(Number);
+    const [eh, em] = eTime.split(':').map(Number);
+    let totalHours = (eh - sh) + (em - sm) / 60;
+    totalHours = totalHours < 0 ? totalHours + 24 : totalHours;
+    const hourRate = totalHours > 0 ? (dayRate / totalHours).toFixed(2) : 0.00;
+    return { hourRate, totalHours };
+  }
+  // 初始化时间选择器列表
+  function initTimePicker() {
+    const listHour = document.getElementById('listHour');
+    const listMin = document.getElementById('listMin');
+    listHour.innerHTML = '';
+    listMin.innerHTML = '';
+    itemsHour = [];
+    itemsMin = [];
+    // 初始化小时 00-23 顺序排列
+    for (let i = 0; i <= 23; i++) {
+      const d = document.createElement('div');
+      d.className = 'item';
+      d.textContent = String(i).padStart(2, '0');
+      listHour.appendChild(d);
+      itemsHour.push(d);
+    }
+    // 初始化分钟 00-59 顺序排列
+    for (let i = 0; i <= 59; i++) {
+      const d = document.createElement('div');
+      d.className = 'item';
+      d.textContent = String(i).padStart(2, '0');
+      listMin.appendChild(d);
+      itemsMin.push(d);
+    }
+    // 绑定滑动事件
+    bindColumn(document.getElementById('colHour'), listHour, itemsHour, 23, HOUR_INERTIA, HOUR_MAX_STEP, HOUR_VEL_DECAY, () => pickerHour, v => { pickerHour = v; });
+    bindColumn(document.getElementById('colMin'), listMin, itemsMin, 59, MIN_INERTIA, MIN_MAX_STEP, MIN_VEL_DECAY, () => pickerMin, v => { pickerMin = v; });
+  }
+  // 绑定单列滑动逻辑 - 核心修复滑动计算、首次滚动异常
+  function bindColumn(col, list, items, maxIndex, inertiaPower, maxStep, velDecay, getIndex, setIndex) {
+    let startY = 0;
+    let isDrag = false;
+    let lastY = 0;
+    let velocity = 0;
+    let lastTime = 0;
+    let currentTranslate = 0;
+    // 初始化定位到默认值
+    const initIndex = getIndex();
+    currentTranslate = -(initIndex * ITEM_HEIGHT) + (col.clientHeight / 2 - ITEM_HEIGHT / 2);
+    list.style.transform = `translate3d(0, ${currentTranslate}px, 0)`;
+    items.forEach((it, idx) => it.classList.toggle('active', idx === initIndex));
+    // 计算居中位置（核心：基于实际DOM高度，固定公式）
+    function centerPos(index) {
+      return -(index * ITEM_HEIGHT) + (col.clientHeight / 2 - ITEM_HEIGHT / 2);
+    }
+    // 精准定位到指定索引
+    function goTo(index) {
+      index = Math.max(0, Math.min(index, maxIndex));
+      setIndex(index);
+      currentTranslate = centerPos(index);
+      list.style.transform = `translate3d(0, ${currentTranslate}px, 0)`;
+      items.forEach((it, idx) => it.classList.toggle('active', idx === index));
+    }
+    col.addEventListener('touchstart', e => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = col.getBoundingClientRect();
+      if (touch.clientX >= rect.left && touch.clientX <= rect.right && touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+        startY = touch.clientY;
+        lastY = touch.clientY;
+        lastTime = Date.now();
+        isDrag = true;
+        list.style.transition = 'none'; // 拖动时取消过渡
+        velocity = 0; // 重置速度
+      }
+    }, { passive: false });
+    col.addEventListener('touchmove', e => {
+      if (!isDrag) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const y = touch.clientY;
+      const now = Date.now();
+      const dt = now - lastTime;
+      // 实时计算偏移，跟随手指（下滑y增大，translate增大，显示上方内容）
+      const diffY = y - lastY;
+      currentTranslate += diffY;
+      list.style.transform = `translate3d(0, ${currentTranslate}px, 0)`;
+      // 计算滑动速度
+      if (dt > 0) {
+        velocity = diffY / dt;
+      }
+      lastY = y;
+      lastTime = now;
+    }, { passive: false });
+    col.addEventListener('touchend', () => {
+      if (!isDrag) return;
+      isDrag = false;
+      list.style.transition = ANIM_SMOOTH; // 结束拖动开启过渡
+      // 计算最终选中索引 - 修复首次滚动、数值错位问题
+      let targetIndex = Math.round(-(currentTranslate - (col.clientHeight / 2 - ITEM_HEIGHT / 2)) / ITEM_HEIGHT);
+      // 速度惯性修正（弱化惯性，避免跳变）
+      targetIndex -= Math.round(velocity * inertiaPower * 2);
+      // 边界限制
+      targetIndex = Math.max(0, Math.min(maxIndex, targetIndex));
+      // 步长限制，防止一次滑太远
+      const currIndex = getIndex();
+      const diff = targetIndex - currIndex;
+      targetIndex = currIndex + Math.max(-maxStep, Math.min(maxStep, diff));
+      // 最终定位
+      goTo(targetIndex);
+      velocity *= velDecay;
+    }, { passive: false });
+  }
+  // 获取系统当前时间并格式化
+  function getCurrentTime() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
+  }
+  // 打开时间选择器 - 核心：默认系统当前时间+精准初始化定位
+  function openTimePicker(input, title) {
+    currentInput = input;
+    // 优先用输入框已有值，无值则取【系统当前时间】
+    const useTime = input.value || getCurrentTime();
+    const [h, m] = useTime.split(':').map(Number);
+    pickerHour = h || new Date().getHours();
+    pickerMin = m || new Date().getMinutes();
+    document.getElementById('pickerTitle').textContent = title;
+    document.getElementById('timePickerModal').style.display = 'flex';
+    // 强制重新初始化定位，解决首次打开错位
+    setTimeout(() => {
+      const hourCol = document.getElementById('colHour');
+      const minCol = document.getElementById('colMin');
+      const hourList = document.getElementById('listHour');
+      const minList = document.getElementById('listMin');
+      // 手动计算并设置定位
+      const hourTranslate = -(pickerHour * ITEM_HEIGHT) + (hourCol.clientHeight / 2 - ITEM_HEIGHT / 2);
+      const minTranslate = -(pickerMin * ITEM_HEIGHT) + (minCol.clientHeight / 2 - ITEM_HEIGHT / 2);
+      hourList.style.transform = `translate3d(0, ${hourTranslate}px, 0)`;
+      minList.style.transform = `translate3d(0, ${minTranslate}px, 0)`;
+      // 重置active样式
+      itemsHour.forEach((it, idx) => it.classList.toggle('active', idx === pickerHour));
+      itemsMin.forEach((it, idx) => it.classList.toggle('active', idx === pickerMin));
+    }, 30);
+  }
+  // 关闭时间选择器
+  function closeTimePicker() {
+    document.getElementById('timePickerModal').style.display = 'none';
+    currentInput = null;
+  }
+  // 确认选择时间
+  function confirmTime() {
+    if (!currentInput) return;
+    const time = `${String(pickerHour).padStart(2,0)}:${String(pickerMin).padStart(2,0)}`;
+    currentInput.value = time;
+    closeTimePicker();
+  }
+  // ===================== 日薪版核心逻辑 =====================
+  // 切换Tab栏
+  document.getElementById('tabMoney').onclick = () => {
+    document.getElementById('liveIncome').style.display = 'block';
+    document.getElementById('calendarModule').style.display = 'none';
+    document.getElementById('tabMoney').classList.add('active');
+    document.getElementById('tabCal').classList.remove('active');
+  };
+  document.getElementById('tabCal').onclick = () => {
+    cy = today.getFullYear();
+    cm = today.getMonth();
+    selectedSet.clear();
+    currentDay = todayKey;
+    renderCal();
+    showCurrent();
+    document.getElementById('liveIncome').style.display = 'none';
+    document.getElementById('calendarModule').style.display = 'block';
+    document.getElementById('tabMoney').classList.remove('active');
+    document.getElementById('tabCal').classList.add('active');
+  };
+  // 连续选择开关
+  const sw = document.getElementById('batchSwitch');
+  sw.onclick = () => {
+    isBatch = !isBatch;
+    sw.classList.toggle('on', isBatch);
+    selectedSet.clear();
+    currentDay = null;
+    hideAll();
+    document.getElementById('batchPanel').classList.remove('active');
+    renderCal();
+  };
+  // 实时收入 + 反向圆环倒计时（日薪版）
+  function refreshIncome() {
+    const sch = schedules[todayKey];
+    const circle = document.getElementById('circleProgress');
+    const timer = document.getElementById('timer');
+    const tips = document.getElementById('tips');
+    const totalIncome = document.getElementById('totalIncome');
+    const status = document.getElementById('status');
+    if (!sch) {
+      status.innerText = '今日无排班';
+      timer.innerText = '00:00:00';
+      totalIncome.innerText = '今日收入：0.00 元';
+      circle.style.background = 'conic-gradient(#22c55e 0%, #f8fafc 0%)';
+      tips.innerText = '距离下班';
+      return;
+    }
+    const now = new Date();
+    const [sh, sm] = sch.s.split(':').map(Number);
+    const [eh, em] = sch.e.split(':').map(Number);
+    const st = new Date(now.getFullYear(), now.getMonth(), now.getDate(), sh, sm, 0);
+    const et = new Date(now.getFullYear(), now.getMonth(), now.getDate(), eh, em, 0);
+    const dailySalary = +sch.r; // 日薪
+    const totalMs = et - st; // 总工作时长（毫秒）
+    if (now < st) {
+      status.innerText = '还没到上班时间';
+      timer.innerText = '00:00:00';
+      totalIncome.innerText = '今日收入：0.00 元';
+      circle.style.background = 'conic-gradient(#22c55e 100%, #f8fafc 100%)';
+      tips.innerText = '距离上班';
+      return;
+    }
+    if (now >= et) {
+      const income = dailySalary;
+      const hh = Math.floor(totalMs / 3600000);
+      const mm = Math.floor((totalMs / 60000) % 60);
+      status.innerText = '已下班';
+      timer.innerText = `${String(hh).padStart(2,0)}:${String(mm).padStart(2,0)}:00`;
+      totalIncome.innerText = `今日收入：${income.toFixed(2)} 元`;
+      circle.style.background = 'conic-gradient(#22c55e 0%, #f8fafc 0%)';
+      tips.innerText = '工作结束';
+      return;
+    }
+    const used = now - st; // 已工作时长（毫秒）
+    const left = et - now; // 剩余时长（毫秒）
+    const per = ((totalMs - used) / totalMs) * 100; // 剩余百分比
+    const leftSec = Math.floor(left / 1000);
+    const hh = Math.floor(leftSec / 3600);
+    const mm = Math.floor((leftSec % 3600) / 60);
+    const ss = leftSec % 60;
+    const income = (used / totalMs) * dailySalary; // 实时收入 = 日薪 * 已工作比例
+    timer.innerText = `${String(hh).padStart(2,0)}:${String(mm).padStart(2,0)}:${String(ss).padStart(2,0)}`;
+    totalIncome.innerText = `今日收入：${income.toFixed(2)} 元`;
+    status.innerText = '正在上班中';
+    tips.innerText = '距离下班';
+    circle.style.background = `conic-gradient(#22c55e ${per}%, #f8fafc ${per}%)`;
+  }
+  setInterval(refreshIncome, 1000);
+  // 日历渲染
+  function renderCal() {
+    const box = document.getElementById('calDays');
+    box.innerHTML = '';
+    document.getElementById('calTitle').innerText = `${cy}年${cm+1}月`;
+    let first = new Date(cy, cm, 1).getDay();
+    if (first === 0) first = 7;
+    const days = new Date(cy, cm+1, 0).getDate();
+    for (let i=1; i<first; i++) box.appendChild(document.createElement('div'));
+    for (let d=1; d<=days; d++) {
+      const key = `${cy}-${String(cm+1).padStart(2,0)}-${String(d).padStart(2,0)}`;
+      const el = document.createElement('div');
+      el.className = 'calendar-day';
+      el.innerHTML = `<span>${d}</span>`;
+      if (d === today.getDate() && cm === today.getMonth() && cy === today.getFullYear()) el.classList.add('today');
+      if (selectedSet.has(key) || currentDay === key) el.classList.add('selected');
+      if (schedules[key]) {
+        const dot = document.createElement('div');
+        dot.className = 'work-dot';
+        el.appendChild(dot);
+      }
+      el.onclick = () => {
+        if (isBatch) {
+          selectedSet.has(key) ? selectedSet.delete(key) : selectedSet.add(key);
+          currentDay = null;
+          renderCal();
+          document.getElementById('batchPanel').classList.toggle('active', selectedSet.size > 0);
+          hideAll();
+          return;
+        }
+        currentDay = key;
+        selectedSet.clear();
+        renderCal();
+        showCurrent();
+      };
+      box.appendChild(el);
+    }
+  }
+  function hideAll() {
+    document.getElementById('dayForm').classList.remove('active');
+    document.getElementById('dayInfo').classList.remove('active');
+  }
+  function showCurrent() {
+    if (!currentDay) { hideAll(); return; }
+    const sch = schedules[currentDay];
+    if (!sch) {
+      document.getElementById('setStart').value = '';
+      document.getElementById('setEnd').value = '';
+      document.getElementById('setRate').value = '';
+      document.getElementById('dayForm').classList.add('active');
+      document.getElementById('dayInfo').classList.remove('active');
+    } else {
+      document.getElementById('infoDate').innerText = currentDay;
+      document.getElementById('infoTime').innerText = `${sch.s} ~ ${sch.e}`;
+      document.getElementById('infoRate').innerText = `${sch.r} 元/天`;
+      // 计算并渲染时薪
+      const { hourRate } = calcHourRate(sch.s, sch.e, sch.r);
+      document.getElementById('infoHourRate').innerText = `${hourRate} 元/小时`;
+      document.getElementById('dayForm').classList.remove('active');
+      document.getElementById('dayInfo').classList.add('active');
+    }
+  }
+  // 批量保存
+  document.getElementById('saveBatch').onclick = () => {
+    const s = document.getElementById('batchStart').value;
+    const e = document.getElementById('batchEnd').value;
+    const r = +document.getElementById('batchRate').value;
+    if (!s || !e || !r || r <= 0) return;
+    selectedSet.forEach(k => { schedules[k] = { s,e,r }; });
+    localStorage.setItem('schedules', JSON.stringify(schedules));
+    selectedSet.clear();
+    document.getElementById('batchPanel').classList.remove('active');
+    renderCal();
+    refreshIncome();
+  };
+  // 批量删除弹窗
+  document.getElementById('deleteBatch').onclick = () => {
+    document.getElementById('batchDelModal').style.display = 'flex';
+  };
+  document.getElementById('batchDelCancel').onclick = () => {
+    document.getElementById('batchDelModal').style.display = 'none';
+  };
+  document.getElementById('batchDelConfirm').onclick = () => {
+    selectedSet.forEach(k => delete schedules[k]);
+    localStorage.setItem('schedules', JSON.stringify(schedules));
+    selectedSet.clear();
+    document.getElementById('batchPanel').classList.remove('active');
+    document.getElementById('batchDelModal').style.display = 'none';
+    renderCal();
+    refreshIncome();
+  };
+  // 单日保存
+  document.getElementById('saveDay').onclick = () => {
+    const s = document.getElementById('setStart').value;
+    const e = document.getElementById('setEnd').value;
+    const r = +document.getElementById('setRate').value;
+    if (!s || !e || !r || r <= 0) return;
+    schedules[currentDay] = { s,e,r };
+    localStorage.setItem('schedules', JSON.stringify(schedules));
+    renderCal();
+    showCurrent();
+    refreshIncome();
+  };
+  // 单日修改
+  document.getElementById('modifyDay').onclick = () => {
+    const sch = schedules[currentDay];
+    document.getElementById('setStart').value = sch.s;
+    document.getElementById('setEnd').value = sch.e;
+    document.getElementById('setRate').value = sch.r;
+    document.getElementById('dayForm').classList.add('active');
+    document.getElementById('dayInfo').classList.remove('active');
+  };
+  // 单日删除弹窗
+  document.getElementById('removeDay').onclick = () => {
+    document.getElementById('delModal').style.display = 'flex';
+  };
+  document.getElementById('deleteDay').onclick = () => {
+    document.getElementById('delModal').style.display = 'flex';
+  };
+  document.getElementById('delCancel').onclick = () => {
+    document.getElementById('delModal').style.display = 'none';
+  };
+  document.getElementById('delConfirm').onclick = () => {
+    if (currentDay) delete schedules[currentDay];
+    localStorage.setItem('schedules', JSON.stringify(schedules));
+    renderCal();
+    showCurrent();
+    refreshIncome();
+    document.getElementById('delModal').style.display = 'none';
+  };
+  // 月份切换
+  function prevMonth() {
+    cm--;
+    if (cm < 0) { cm = 11; cy--; }
+    renderCal();
+  }
+  function nextMonth() {
+    cm++;
+    if (cm > 11) { cm = 0; cy++; }
+    renderCal();
+  }
+  document.getElementById('prevMonth').onclick = prevMonth;
+  document.getElementById('nextMonth').onclick = nextMonth;
+  // 左右滑动切换月份
+  let startX = 0;
+  let isSwiping = false;
+  const swipeThreshold = 50; // 滑动阈值
+  const calendarSwipe = document.getElementById('calendarSwipe');
+  calendarSwipe.addEventListener('touchstart', (e) => {
+    if (isBatch) return; // 批量选择模式下不触发滑动
+    startX = e.touches[0].clientX;
+    isSwiping = true;
+  }, { passive: true });
+  calendarSwipe.addEventListener('touchmove', (e) => {
+    if (!isSwiping || isBatch) return;
+    // 这里可以添加滑动时的视觉反馈，比如跟随手指移动
+  }, { passive: true });
+  calendarSwipe.addEventListener('touchend', (e) => {
+    if (!isSwiping || isBatch) return;
+    const endX = e.changedTouches[0].clientX;
+    const diffX = startX - endX;
+    if (Math.abs(diffX) > swipeThreshold) {
+      if (diffX > 0) {
+        // 向左滑 → 下一月
+        nextMonth();
+      } else {
+        // 向右滑 → 上一月
+        prevMonth();
+      }
+    }
+    isSwiping = false;
+  }, { passive: true });
+  // 绑定时间输入框点击
+  document.getElementById('batchStart').onclick = function(){openTimePicker(this, '选择上班时间')};
+  document.getElementById('batchEnd').onclick = function(){openTimePicker(this, '选择下班时间')};
+  document.getElementById('setStart').onclick = function(){openTimePicker(this, '选择上班时间')};
+  document.getElementById('setEnd').onclick = function(){openTimePicker(this, '选择下班时间')};
+  // 时间选择器按钮事件
+  document.getElementById('pickerCancel').onclick = closeTimePicker;
+  document.getElementById('pickerConfirm').onclick = confirmTime;
+  // 点击遮罩关闭时间选择器
+  document.getElementById('timePickerModal').addEventListener('click', function(e) {
+    if (e.target === this) closeTimePicker();
+  });
+  // 页面加载完成后初始化
+  window.addEventListener('load', () => {
+    initTimePicker();
+    renderCal();
+    refreshIncome();
+    currentDay = todayKey;
+    showCurrent();
+  });
+  // 窗口大小变化时重新初始化时间选择器，防止定位错位
+  window.addEventListener('resize', initTimePicker);
+</script>
+</body>
+</html>
